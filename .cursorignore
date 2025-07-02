@@ -1,0 +1,32 @@
+# 系统配置文件
+~/.zshrc
+~/.bash_profile
+~/.bashrc
+~/.profile
+~/.ssh/
+~/.aws/
+~/.docker/
+
+# 敏感文件
+*.env
+.env*
+**/secrets.json
+**/*api_key*
+**/*token*
+**/*password*
+
+# 私人目录
+~/Documents/
+~/Desktop/
+~/Downloads/
+
+# 系统目录
+/etc/
+/usr/
+/var/
+/tmp/
+
+# 其他敏感位置
+~/.config/
+~/.local/
+~/Library/ 
