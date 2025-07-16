@@ -50,7 +50,7 @@ class Article(BaseModel):
     link: str
     snippet: str
 
-    @classmethod
+    @classmethod #装饰器，表示下面的方法是“类方法” 
     def from_serpapi_result(cls, result: dict) -> "Article":
         return cls(
             title=result["title"],
@@ -126,6 +126,7 @@ class QueueCallbackHandler(AsyncCallbackHandler):
     
     async def on_llm_new_token(self, *args, **kwargs) -> None:
         chunk = kwargs.get("chunk")
+        # 回调系统中的消息对象会被外包一层
         if chunk and chunk.message.additional_kwargs.get("tool_calls"):
             if chunk.message.additional_kwargs["tool_calls"][0]["function"]["name"] == "final_answer":
                 self.final_answer_seen = True
@@ -169,18 +170,19 @@ class CustomAgentExecutor:
         agent_scratchpad: list[AIMessage | ToolMessage] = []
         # streaming function
         async def stream(query: str) -> list[AIMessage]:
-            response = self.agent.with_config(
+            configured_agent = self.agent.with_config(
                 callbacks=[streamer]
             )
             # we initialize the output dictionary that we will be populating with
             # our streamed output
             outputs = []
             # now we begin streaming
-            async for token in response.astream({
+            async for token in configured_agent.astream({
                 "input": query,
                 "chat_history": self.chat_history,
                 "agent_scratchpad": agent_scratchpad
             }):
+                # 流式响应中 直接返回消息对象
                 tool_calls = token.additional_kwargs.get("tool_calls")
                 if tool_calls:
                     # first check if we have a tool call id - this indicates a new tool
@@ -205,13 +207,27 @@ class CustomAgentExecutor:
             tool_obs = await asyncio.gather(
                 *[execute_tool(tool_call) for tool_call in tool_calls]
             )
+            #等同于tool_obs = await asyncio.gather(execute_tool(tool_call1)， execute_tool(tool_call2),...)
+                
             # append tool calls and tool observations to the scratchpad in order
             id2tool_obs = {tool_call.tool_call_id: tool_obs for tool_call, tool_obs in zip(tool_calls, tool_obs)}
             for tool_call in tool_calls:
                 agent_scratchpad.extend([
-                    tool_call,
-                    id2tool_obs[tool_call.tool_call_id]
+                    tool_call, # AIMessage
+                    id2tool_obs[tool_call.tool_call_id] # ToolMessage
                 ])
+            """
+            [AIMessage(context = '', tool_calls = [
+                {
+                    "name": "final_answer",
+                    "args": {"answer": "10"},
+                    "id": "call_123"
+                }
+            ], tool_call_id = 'call_123'),
+            ToolMessage(content = '10', tool_call_id = 'call_123')
+            ]
+
+            """
             
             count += 1
             # if the tool call is the final answer tool, we stop
